@@ -4,7 +4,7 @@ class Config:
     QUESTION_GENERATION_LLM_MODEL = "gemma3:12b"
     QUESTION_GENERATION_TEMPERATURE = 0
     
-    # API settings for RAG tool (DubBot/BdcBot)
+    # API settings for RAG tool (DugBot/BdcBot)
     API_BASE_URL = "http://localhost:8000"  # change to your API endpoint
     API_ENDPOINT = "/qv-app/invoke"         # change to your endpoint format
     API_TIMEOUT = 30                        # seconds
