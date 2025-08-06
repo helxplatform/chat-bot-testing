@@ -1,45 +1,77 @@
+from dotenv import load_dotenv
+import os
+import json
+# Load environment variables from a .env file if it exists.
+# This line looks for a file named '.env' in the current directory or parent directories.
+load_dotenv()
+
 class Config:
-    # Question generation LLM settings
-    QUESTION_GENERATION_LLM_URL = "http://localhost:11434"
-    QUESTION_GENERATION_LLM_MODEL = "gemma3:12b"
-    QUESTION_GENERATION_TEMPERATURE = 0
-    
-    # API settings for RAG tool (DugBot/BdcBot)
-    API_BASE_URL = "http://localhost:8000"  # change to your API endpoint
-    API_ENDPOINT = "/qv-app/invoke"         # change to your endpoint format
-    API_TIMEOUT = 30                        # seconds
-    API_DELAY = 1                          # seconds between requests
-    
-    # Output directories
-    RESULTS_DIR = "results"
-    DATASETS_DIR = "datasets"
-    
-    # Question generation settings
-    DEFAULT_NUM_QUESTIONS = 400
-    QUESTION_TYPES = {
+    """
+    Configuration class for the application.
+
+    Reads settings from environment variables or a .env file.
+    Provides default values for all settings.
+    """
+
+    # Helper function to read boolean values from environment variables
+    @staticmethod
+    def _get_bool(key, default_value):
+        """Converts string environment variables to booleans."""
+        return os.getenv(key, str(default_value)).lower() in ('true', '1', 't')
+
+    # --- Question generation LLM settings ---
+    QUESTION_GENERATION_LLM_URL = os.getenv("QUESTION_GENERATION_LLM_URL", "http://localhost:11434")
+    QUESTION_GENERATION_LLM_MODEL = os.getenv("QUESTION_GENERATION_LLM_MODEL", "gemma3:12b")
+    QUESTION_GENERATION_TEMPERATURE = int(os.getenv("QUESTION_GENERATION_TEMPERATURE", 0))
+
+    # --- API settings for RAG tool (DugBot/BdcBot) ---
+    API_BASE_URL = os.getenv("API_BASE_URL", "https://search-dev.biodatacatalyst.renci.org")
+    API_ENDPOINT = os.getenv("API_ENDPOINT", "/agent/invoke_test")
+    API_TIMEOUT = int(os.getenv("API_TIMEOUT", 120))
+    API_DELAY = int(os.getenv("API_DELAY", 1))
+
+    # --- Output directories ---
+    RESULTS_DIR = os.getenv("RESULTS_DIR", "results")
+    DATASETS_DIR = os.getenv("DATASETS_DIR", "datasets")
+
+    # --- Question generation settings ---
+    DEFAULT_NUM_QUESTIONS = int(os.getenv("DEFAULT_NUM_QUESTIONS", 400))
+
+    # For complex types like dictionaries, it's best to store them as a JSON string
+    # in the environment variable. We provide a default dictionary and then load
+    # the value from the environment if it exists.
+    _default_question_types = {
         "factual": 100,
         "analytical": 100,
         "comparative": 100,
         "unanswerable": 100
     }
-    
-    # CSV settings
-    CSV_ACCESSION_COLUMN = "Accession"
-    CSV_DESCRIPTION_COLUMN = "Description"
-    
-    # RAGAS evaluation LLM settings (LLM will act as evaluator)
-    RAGAS_EVALUATION_LLM_PROVIDER = "ollama"  # "openai" or "ollama"
-    RAGAS_EVALUATION_LLM_API_KEY = None       # for OpenAI
-    RAGAS_EVALUATION_LLM_URL = "http://localhost:11434"  # for Ollama
-    RAGAS_EVALUATION_LLM_MODEL = "gemma3:12b"      # for Ollama
-    RAGAS_EVALUATION_TEMPERATURE = 0.1
-    RAGAS_METRICS = [
-        "context_recall",
-        "faithfulness", 
+    QUESTION_TYPES = json.loads(
+        os.getenv("QUESTION_TYPES", json.dumps(_default_question_types))
+    )
+
+    # --- CSV settings ---
+    CSV_ACCESSION_COLUMN = os.getenv("CSV_ACCESSION_COLUMN", "Accession")
+    CSV_DESCRIPTION_COLUMN = os.getenv("CSV_DESCRIPTION_COLUMN", "Description")
+
+    # --- RAGAS evaluation LLM settings ---
+    RAGAS_EVALUATION_LLM_PROVIDER = os.getenv("RAGAS_EVALUATION_LLM_PROVIDER", "openai")
+    RAGAS_EVALUATION_LLM_API_KEY = os.getenv("RAGAS_EVALUATION_LLM_API_KEY", "EMPTY")
+    RAGAS_EVALUATION_LLM_URL = os.getenv("RAGAS_EVALUATION_LLM_URL", "http://localhost:9091/v1")
+    RAGAS_EVALUATION_LLM_MODEL = os.getenv("RAGAS_EVALUATION_LLM_MODEL", "google/gemma-3-12b-it")
+    RAGAS_EVALUATION_TEMPERATURE = int(os.getenv("RAGAS_EVALUATION_TEMPERATURE", 0))
+
+    # For lists, we can store them as a comma-separated string.
+    _default_ragas_metrics = [
+        # "context_recall",
+        # "faithfulness",
         "factual_correctness",
-        "answer_relevancy"
+        # "answer_relevancy"
     ]
-    
+    # We get the environment variable, fall back to the default joined list, then split by comma.
+    _raw_metrics = os.getenv("RAGAS_METRICS", ",".join(_default_ragas_metrics))
+    RAGAS_METRICS = [metric.strip() for metric in _raw_metrics.split(',') if metric.strip()]
+
     @classmethod
     def update_api_config(cls, base_url=None, endpoint=None, timeout=None, delay=None):
         """Update API configuration at runtime"""

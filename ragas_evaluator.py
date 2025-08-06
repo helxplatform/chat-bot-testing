@@ -34,7 +34,7 @@ class RAGASEvaluator:
                 if eval_config["api_key"]:
                     os.environ["OPENAI_API_KEY"] = eval_config["api_key"]
                 self.evaluator_llm = LangchainLLMWrapper(
-                    ChatOpenAI(model="gpt-4o", temperature=eval_config["temperature"])
+                    ChatOpenAI(model=eval_config["model"], temperature=eval_config["temperature"])
                 )
             elif eval_config["provider"] == "ollama":
                 # Set a dummy OpenAI key to prevent RAGAS from failing
@@ -63,11 +63,11 @@ class RAGASEvaluator:
         for result in api_results['results']:
             if result['api_status'] == 'success':
                 # extract context from question data if available
-                context = result.get('context', result.get('expected_answer', ''))
+                context = result.get('retrieved_contexts', [])
                 
                 ragas_item = {
                     "user_input": result['question'],
-                    "retrieved_contexts": [context] if isinstance(context, str) else context,
+                    "reference_contexts": context,
                     "reference": result['expected_answer'],
                     "response": result['actual_answer']
                 }
@@ -116,16 +116,15 @@ class RAGASEvaluator:
             
             # convert to dictionary
             ragas_scores = {}
-            for metric_name in Config.RAGAS_METRICS:
-                if metric_name in result:
-                    ragas_scores[metric_name] = float(result[metric_name])
+            for metric_score in result.scores:
+                ragas_scores.update(metric_score)
             
             # create comprehensive evaluation
             evaluation = {
                 "evaluation_info": {
                     "total_responses_evaluated": len(ragas_data),
                     "evaluation_date": datetime.now().isoformat(),
-                    "metrics_used": Config.RAGAS_METRICS
+                    "metrics_used": [m.name for m in metrics]
                 },
                 "ragas_scores": ragas_scores,
                 "api_performance": api_results['test_info'],

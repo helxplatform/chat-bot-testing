@@ -2,11 +2,15 @@ import json
 import requests
 import time
 import asyncio
-import aiohttp
+# import aiohttp
 from typing import Dict, Any, List
 from pathlib import Path
 from datetime import datetime
 from config import Config
+import logging
+
+
+logger = logging.getLogger('api-tester')
 
 class APITester:
     def __init__(self, api_config: Dict[str, Any] = None):
@@ -35,21 +39,7 @@ class APITester:
             else:
                 # Format for LangServe API
                 payload = {
-                    "input": {
-                        "input": question,
-                        "next": "string",
-                        "chat_history": [],
-                        "extra": {},
-                        "user_intent": {}
-                    },
-                    "config": {
-                        "configurable": {
-                            "checkpoint_id": "string",
-                            "checkpoint_ns": "",
-                            "thread_id": ""
-                        }
-                    },
-                    "kwargs": {}
+                    "query": question
                 }
                 response = requests.post(url, json=payload, timeout=self.timeout)
             
@@ -58,12 +48,12 @@ class APITester:
             
             if response.status_code == 200:
                 result = response.json()
-                answer = self._extract_answer_from_response(result)
                 
                 return {
                     "status": "success",
                     "question": question,
-                    "answer": answer,
+                    "answer": result["response"],
+                    "retrieved_contexts": result["retrieved_contexts"],
                     "full_response": result,
                     "response_time": response_time,
                     "status_code": response.status_code
@@ -78,7 +68,8 @@ class APITester:
                     "status_code": response.status_code
                 }
                 
-        except requests.exceptions.Timeout:
+        except requests.exceptions.Timeout as timeout_exp:
+            logger.error(f"{timeout_exp} on url {url}")
             return {
                 "status": "timeout",
                 "question": question,
@@ -88,6 +79,7 @@ class APITester:
                 "status_code": None
             }
         except Exception as e:
+            logger.error(f"exception {e} on url {url}")
             return {
                 "status": "error",
                 "question": question,
@@ -149,6 +141,7 @@ class APITester:
                 "question": question,
                 "expected_answer": expected_answer,
                 "actual_answer": api_result['answer'],
+                "retrieved_contexts": api_result.get("retrieved_contexts", None),
                 "api_status": api_result['status'],
                 "response_time": api_result['response_time'],
                 "status_code": api_result['status_code']
