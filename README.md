@@ -15,24 +15,10 @@ Testing framework for biomedical RAG applications via FastAPI endpoints. Generat
 ```bash
 pip install -r requirements.txt
 ```
+### Configuration 
 
-Configure endpoints in `config.py`:
-```python
-# API settings - update these for your system
-API_BASE_URL = "http://localhost:8000"     # your API endpoint
-API_ENDPOINT = "/query/{question}"         # your endpoint format
-
-# Question generation LLM
-QUESTION_GENERATION_LLM_URL = "http://localhost:11434"
-QUESTION_GENERATION_LLM_MODEL = "llama3.1:latest" OR "gemma3:12b"
-
-# RAGAS evaluation LLM (choose provider)
-RAGAS_EVALUATION_LLM_PROVIDER = "openai"  # "openai" or "ollama"
-RAGAS_EVALUATION_LLM_API_KEY = "your-openai-key"  # for OpenAI
-RAGAS_EVALUATION_LLM_URL = "http://localhost:11434"  # for Ollama
-RAGAS_EVALUATION_LLM_MODEL = "llama3.1:latest"   OR "gemma3:12b"   # for Ollama
-```
-
+To Configure the application,  please copy [.env-template](.env-template) to a new `.env` file and modify the appropriate variables. 
+When the program starts it will load in .env file automatically.
 
 ### Process Flow
 
