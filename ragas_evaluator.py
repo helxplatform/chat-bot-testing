@@ -67,7 +67,7 @@ class RAGASEvaluator:
                 
                 ragas_item = {
                     "user_input": result['question'],
-                    "reference_contexts": context,
+                    "retrieved_contexts": context,
                     "reference": result['expected_answer'],
                     "response": result['actual_answer']
                 }
