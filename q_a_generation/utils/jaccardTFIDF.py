@@ -9,14 +9,6 @@ class WeightedJaccardBuilder(RelationshipBuilder):
     new_property_name: str = "weighted_jaccard"
     threshold: float = 0.3
 
-    # REQUIRED
-    def filter_nodes(self, kg):
-        return kg.nodes
-
-    # REQUIRED
-    def filter(self, kg):
-        return kg
-
     async def transform(self, kg: KnowledgeGraph):
         docs = [" ".join(n.get_property(self.property_name) or []) for n in kg.nodes]
 
