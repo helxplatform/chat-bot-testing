@@ -1,3 +1,7 @@
+"""
+Single-Hop RAGAS KG Testset Generator (2025 API)
+"""
+
 from __future__ import annotations
 import argparse, asyncio, random
 from pathlib import Path
@@ -6,17 +10,19 @@ import pandas as pd
 
 from ragas.testset.graph import Node, KnowledgeGraph, NodeType
 from ragas.testset.transforms import apply_transforms, Parallel
-from ragas.testset.synthesizers.single_hop import (
+from ragas.testset.synthesizers.single_hop.base import (
     SingleHopQuerySynthesizer,
     SingleHopScenario,
 )
+from ragas.testset.synthesizers.base import QueryStyle, QueryLength
 
 from ragas.testset import TestsetGenerator
-from ragas.llms.base import llm_factory
-from ragas.embeddings import OpenAIEmbeddings
+from ragas.llms.base import llm_factory, LangchainLLMWrapper
+from ragas.embeddings import embedding_factory, LangchainEmbeddingsWrapper
 from ragas.testset.persona import Persona
-
-from openai import OpenAI
+from langchain_openai import ChatOpenAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
+import os
 
 # from ragas_benchmark.utils.scispacyNER import SciSpacyNERExtractor
 from utils.scispacyNER import SciSpacyNERExtractor
@@ -35,24 +41,46 @@ DEFAULT_PERSONA = Persona(
 
 # LOAD INPUT STUDIES
 def load_rows(path):
-    if str(path).endswith(".csv"):
+    import json
+    path_str = str(path)
+    if path_str.endswith(".csv"):
         df = pd.read_csv(
             path,
             engine="python",      # <-- handles multiline descriptions
             on_bad_lines="skip",  # <-- avoids crashes
         )
+        rows = []
+        for _, r in df.iterrows():
+            rows.append({
+                "doc_id": r.get("Accession") or r.get("StudyId"),
+                "title": r.get("Study Name") or r.get("StudyName") or "",
+                "abstract": r.get("Description") or "",
+                "permalink": r.get("Permalink") or "",
+            })
+        return rows
+    elif path_str.endswith(".json"):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        rows = []
+        for r in data:
+            rows.append({
+                "doc_id": r.get("Accession") or r.get("StudyId"),
+                "title": r.get("Study Name") or r.get("StudyName") or "",
+                "abstract": r.get("Description") or "",
+                "permalink": r.get("Permalink") or "",
+            })
+        return rows
     else:
         df = pd.read_excel(path)
-
-    rows = []
-    for _, r in df.iterrows():
-        rows.append({
-            "doc_id": r.get("Accession") or r.get("StudyId"),
-            "title": r.get("Study Name") or "",
-            "abstract": r.get("Description") or "",
-            "permalink": r.get("Permalink") or "",
-        })
-    return rows
+        rows = []
+        for _, r in df.iterrows():
+            rows.append({
+                "doc_id": r.get("Accession") or r.get("StudyId"),
+                "title": r.get("Study Name") or r.get("StudyName") or "",
+                "abstract": r.get("Description") or "",
+                "permalink": r.get("Permalink") or "",
+            })
+        return rows
 
 
 
@@ -102,9 +130,9 @@ async def enrich_graph(nodes, outdir):
         n.properties["entities"] = ents
 
     transforms = [
-        WeightedJaccardBuilder("entities", "weighted_jaccard_similarity", 0.5),
-        JaccardSimilarityBuilder("entities", "entity_jaccard_similarity", 0.5),
-        ClusterCentroidBuilder("entities", "centroid_similarity"),
+        WeightedJaccardBuilder(property_name="entities", new_property_name="weighted_jaccard_similarity", threshold=0.5),
+        JaccardSimilarityBuilder(property_name="entities", new_property_name="entity_jaccard_similarity", threshold=0.5),
+        ClusterCentroidBuilder(property_name="entities", new_property_name="centroid_similarity"),
     ]
 
     maybe = apply_transforms(kg, transforms)
@@ -116,9 +144,8 @@ async def enrich_graph(nodes, outdir):
 class MySingleHopQuery(SingleHopQuerySynthesizer):
 
     def __init__(self, kg, llm, is_async=True):
-        super().__init__()
+        super().__init__(llm=llm)
         self.kg = kg
-        self.llm = llm
         self.is_async = is_async
 
     async def _generate_scenarios(self, *args, n_samples=None, persona=None, **kwargs):
@@ -147,20 +174,13 @@ class MySingleHopQuery(SingleHopQuerySynthesizer):
             for e1, e2 in pairs:
                 scenario = SingleHopScenario(
                     term=f"{e1} → {e2}",
-                    question=f"What is the relationship between {e1} and {e2}?",
-                    reference=f"{e1} and {e2} are directly related according to the study abstract.",
-                    documents=[doc],
                     nodes=[doc],
                     persona=DEFAULT_PERSONA,
-                    style="Perfect grammar",
-                    length="short",
-                    metadata={
-                        "hop_type": "single",
-                        "source": "abstract_entity_pair"
-                    },
+                    style=QueryStyle.PERFECT_GRAMMAR,
+                    length=QueryLength.SHORT,
                 )
 
-                scenarios.append(scenario)
+                scenarios.append(scenario) 
 
                 if len(scenarios) >= n_samples:
                     return scenarios
@@ -173,8 +193,20 @@ async def _amain(args):
     nodes = build_nodes(rows)
     kg = await enrich_graph(nodes, Path(args.outdir))
 
-    llm = llm_factory("gpt-4o-mini")
-    embeddings = OpenAIEmbeddings(client=OpenAI(), model="text-embedding-3-small")
+    # Use local vLLM server
+    llm_url = os.environ.get("LLM_URL", "http://localhost:9091/v1")
+    llm_model = os.environ.get("LLM_MODEL", "google/gemma-3-12b-it")
+
+    chat_llm = ChatOpenAI(
+        model=llm_model,
+        base_url=llm_url,
+        api_key="not-needed",  # vLLM doesn't require API key
+    )
+    llm = LangchainLLMWrapper(chat_llm)
+
+    # Use local HuggingFace embeddings
+    hf_embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    embeddings = LangchainEmbeddingsWrapper(hf_embeddings)
 
     personas = [
         Persona(name="Clinician", role_description="Interprets biomedical results."),
@@ -187,7 +219,7 @@ async def _amain(args):
         llm=llm,
         knowledge_graph=kg,
         embedding_model=embeddings,
-        persona_list=[],
+        persona_list=[],         
     )
 
 
