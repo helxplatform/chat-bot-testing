@@ -1,3 +1,14 @@
+"""
+Modern RAGAS KG Testset Generator (2025 API)
+------------------------------------------------
+✓ SciSpacy NER
+✓ Weighted Jaccard
+✓ Jaccard Similarity
+✓ Centroid Similarity
+✓ Single-Hop + Multi-Hop QA
+✓ Fully compatible with RAGAS 2025 API
+"""
+
 from __future__ import annotations
 import argparse, asyncio, json, uuid, random
 from pathlib import Path
@@ -168,20 +179,7 @@ class MyMultiHopQuery(MultiHopQuerySynthesizer):
                 style="Perfect grammar",
                 length="long",
                 persona=persona,
-                extra_info={
-                        "doc_ids": [
-                            d1.properties.get("doc_id"),
-                            d2.properties.get("doc_id")
-                        ],
-                        "titles": [t1, t2],
-                        "entities_A": ents1,
-                        "entities_B": ents2,
-                        "edge_type": key,
-                        "edge_properties": props,
-                }
             )
-
-
 
             scenarios.append(scenario)
 
