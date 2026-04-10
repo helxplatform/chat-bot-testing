@@ -176,7 +176,7 @@ class MyMultiHopQuery(MultiHopQuerySynthesizer):
             length = random.choice(["short", "long"])
             persona_role = persona.role_description if persona else "Biomedical expert"
 
-
+            
             # LLM PROMPT TO GENERATE MULTI-HOP QA
             prompt = f"""
 You are generating a MULTI-HOP biomedical QUESTION and ANSWER.
