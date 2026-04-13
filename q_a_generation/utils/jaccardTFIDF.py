@@ -11,10 +11,11 @@ class WeightedJaccardBuilder(RelationshipBuilder):
 
     async def transform(self, kg: KnowledgeGraph):
         docs = [" ".join(n.get_property(self.property_name) or []) for n in kg.nodes]
-
         vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b[\w-]+\b")
         X = vectorizer.fit_transform(docs).toarray()
+        feature_names = np.array(vectorizer.get_feature_names_out())
 
+        # Weighted Jaccard similarity
         sims = np.zeros((len(docs), len(docs)))
         for i in range(len(docs)):
             for j in range(i + 1, len(docs)):
