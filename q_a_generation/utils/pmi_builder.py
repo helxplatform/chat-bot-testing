@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 import math
 from dataclasses import dataclass
 from ragas.testset.transforms.base import RelationshipBuilder, KnowledgeGraph, Relationship, Node
@@ -7,21 +7,14 @@ from ragas.testset.transforms.base import RelationshipBuilder, KnowledgeGraph, R
 class PMIRelationshipBuilder(RelationshipBuilder):
     property_name: str = "entities"
     new_property_name: str = "pmi"
-    threshold: float = 0.0
-
-    # REQUIRED
-    def filter_nodes(self, kg):
-        return kg.nodes
-
-    # REQUIRED
-    def filter(self, kg):
-        return kg
+    threshold: float = 0.0  # filter only positive PMI
 
     async def transform(self, kg: KnowledgeGraph):
         all_entities = [e for n in kg.nodes for e in (n.get_property(self.property_name) or [])]
         entity_counts = Counter(all_entities)
         total = sum(entity_counts.values())
 
+        # Co-occurrence counts
         pair_counts = Counter()
         for n in kg.nodes:
             ents = list(set(n.get_property(self.property_name) or []))
@@ -35,7 +28,6 @@ class PMIRelationshipBuilder(RelationshipBuilder):
             p_b = entity_counts[b] / total
             p_ab = c_ab / len(kg.nodes)
             pmi = math.log2(p_ab / (p_a * p_b)) if p_ab > 0 else -float("inf")
-
             if pmi > self.threshold:
                 relationships.append(
                     Relationship(
