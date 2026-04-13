@@ -22,7 +22,7 @@ class HybridRelationshipBuilder(RelationshipBuilder):
     threshold: float = 0.25
 
     async def transform(self, kg: KnowledgeGraph) -> t.List[Relationship]:
-        # 1️⃣  Prepare TF-IDF representation of each node's entity list
+        # 1️⃣  Prepare TF-IDF representation of each node’s entity list
         docs = [" ".join(n.get_property(self.property_name) or []) for n in kg.nodes]
         vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b[\w-]+\b")
         X = vectorizer.fit_transform(docs).toarray()
